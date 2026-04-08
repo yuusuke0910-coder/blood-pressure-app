@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>血圧手帳</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #e74c6f;
+    --primary-light: #f9e0e6;
+    --secondary: #3b82f6;
+    --secondary-light: #dbeafe;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --bg: #f8f9fb;
+    --card: #ffffff;
+    --text: #1a202c;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --radius: 20px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* ヘッダー */
+  .app-header {
+    background: linear-gradient(135deg, #e74c6f, #c0392b);
+    color: white;
+    padding: 20px 20px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 10px rgba(231,76,111,0.3);
+  }
+  .app-header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  .app-header .subtitle { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+
+  /* ナビゲーション */
+  .nav-bar {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    background: white;
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    z-index: 200;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 4px 14px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 500;
+    gap: 4px;
+    transition: color 0.2s;
+  }
+  .nav-item.active { color: var(--primary); }
+  .nav-item svg { width: 24px; height: 24px; }
+
+  /* コンテンツ */
+  .content { padding: 16px; padding-bottom: 90px; }
+  .tab-panel { display: block; opacity: 0; pointer-events: none; transition: opacity 0.22s ease-in-out; position: absolute; width: 100%; }
+  .tab-panel.active { opacity: 1; pointer-events: auto; position: relative; }
+
+  /* カード */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 14px;
+  }
+
+  /* 入力フォーム */
+  .form-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .form-group { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  .form-group input, .form-group select {
+    padding: 12px 14px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 16px;
+    color: var(--text);
+    background: white;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+    font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--primary); }
+
+  /* 血圧入力 */
+  .bp-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .bp-input-group { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bp-input-label { font-size: 11px; font-weight: 700; color: var(--text-muted); }
+  .bp-input-unit { font-size: 10px; color: var(--text-muted); }
+  .bp-input-group input {
+    width: 100%;
+    padding: 14px 8px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--primary);
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  .bp-input-group input:focus { border-color: var(--primary); }
+
+  /* 保存ボタン */
+  .btn-save {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #e74c6f, #c0392b);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(231,76,111,0.35);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    letter-spacing: 0.5px;
+    font-family: inherit;
+  }
+  .btn-save:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 8px rgba(231,76,111,0.25);
+  }
+
+  /* 血圧分類バッジ */
+  .bp-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .badge-normal   { background: #dcfce7; color: #15803d; }
+  .badge-elevated { background: #fef9c3; color: #a16207; }
+  .badge-high1    { background: #ffedd5; color: #c2410c; }
+  .badge-high2    { background: #fee2e2; color: #b91c1c; }
+  .badge-crisis   { background: #7f1d1d; color: white; }
+  .badge-low      { background: #dbeafe; color: #1d4ed8; }
+
+  /* 今日のサマリー */
+  .today-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .summary-item { background: var(--primary-light); border-radius: 12px; padding: 14px; text-align: center; }
+  .summary-item.pulse { background: var(--secondary-light); }
+  .summary-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+  .summary-value { font-size: 28px; font-weight: 800; color: var(--primary); line-height: 1.2; }
+  .summary-item.pulse .summary-value { color: var(--secondary); }
+  .summary-unit { font-size: 11px; color: var(--text-muted); }
+
+  /* 履歴リスト */
+  .record-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .record-item:last-child { border-bottom: none; }
+  .record-time-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .record-time-icon.morning { background: #fff7e0; }
+  .record-time-icon.evening { background: #ede9fe; }
+  .record-info { flex: 1; }
+  .record-date { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .record-values { font-size: 15px; font-weight: 700; color: var(--text); }
+  .record-values span { color: var(--text-muted); font-weight: 400; font-size: 13px; }
+  .record-delete {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; padding: 6px; border-radius: 6px; font-size: 16px;
+  }
+  .record-delete:active { background: #fee2e2; color: var(--danger); }
+
+  /* グラフ */
+  .chart-container { position: relative; width: 100%; height: 220px; margin-bottom: 8px; }
+  .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* 統計カード（改善版：数値大・ラベル下） */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .stat-item { background: var(--bg); border-radius: 14px; padding: 14px 8px; text-align: center; }
+  .stat-value { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .stat-label { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-top: 4px; }
+
+  /* 血圧分類表 */
+  .bp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .bp-table th, .bp-table td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--border); }
+  .bp-table th { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+  .bp-table tr:last-child td { border-bottom: none; }
+
+  /* グラフ期間選択 */
+  .period-tabs {
+    display: flex; background: var(--bg); border-radius: 10px;
+    padding: 4px; margin-bottom: 14px; gap: 4px;
+  }
+  .period-tab {
+    flex: 1; padding: 8px 4px; border: none; border-radius: 8px;
+    background: none; cursor: pointer; font-size: 12px; font-weight: 600;
+    color: var(--text-muted); transition: all 0.2s; font-family: inherit;
+  }
+  .period-tab.active { background: white; color: var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+  /* 設定 */
+  .setting-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .setting-item:last-child { border-bottom: none; }
+  .setting-label { font-size: 14px; font-weight: 500; }
+  .setting-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .setting-input {
+    width: 80px; padding: 8px; border: 2px solid var(--border);
+    border-radius: 8px; font-size: 14px; text-align: center;
+    outline: none; font-family: inherit;
+  }
+  .setting-input:focus { border-color: var(--primary); }
+
+  /* トースト */
+  .toast {
+    position: fixed; bottom: 90px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1a202c; color: white;
+    padding: 12px 24px; border-radius: 30px;
+    font-size: 14px; font-weight: 500;
+    opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 空状態 */
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  /* アラートバナー */
+  .alert-banner {
+    padding: 12px 14px; border-radius: 10px; margin-bottom: 14px;
+    font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .alert-danger  { background: #fee2e2; color: #b91c1c; }
+  .alert-warning { background: #fef9c3; color: #92400e; }
+  .alert-success { background: #dcfce7; color: #15803d; }
+
+  /* フィルターバー */
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; }
+  .filter-bar select {
+    flex: 1; padding: 10px 12px;
+    border: 2px solid var(--border); border-radius: 10px;
+    font-size: 14px; background: white; outline: none; appearance: none;
+    font-family: inherit;
+  }
+  .filter-bar select:focus { border-color: var(--primary); }
+
+  .no-data-chart {
+    display: flex; align-items: center; justify-content: center;
+    height: 220px; color: var(--text-muted); font-size: 14px;
+    background: var(--bg); border-radius: 10px;
+  }
+
+  /* 週間テーブル */
+  .week-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; gap: 8px;
+  }
+  .week-nav-btn {
+    background: var(--bg); border: 2px solid var(--border);
+    border-radius: 10px; padding: 8px 14px; font-size: 18px;
+    cursor: pointer; color: var(--text); transition: background 0.2s; font-family: inherit;
+  }
+  .week-nav-btn:active { background: var(--border); }
+  .week-label { font-size: 13px; font-weight: 700; color: var(--text); text-align: center; flex: 1; }
+
+  .weekly-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+  .weekly-table th {
+    background: var(--bg); padding: 7px 3px; text-align: center;
+    font-weight: 700; font-size: 10px; color: var(--text-muted);
+    border-bottom: 2px solid var(--border);
+  }
+  .weekly-table th.morning-h { background: #fff7e0; color: #d97706; }
+  .weekly-table th.evening-h { background: #ede9fe; color: #7c3aed; }
+  .weekly-table td {
+    padding: 8px 3px; text-align: center;
+    border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text);
+  }
+  .weekly-table tr:last-child td { border-bottom: none; }
+  .weekly-table td.date-cell {
+    font-weight: 700; font-size: 11px; color: var(--text-muted);
+    text-align: left; padding-left: 2px;
+  }
+  .weekly-table td.date-cell.today { color: var(--primary); }
+
+  /* ゼブラストライプ */
+  .weekly-table tbody tr:nth-child(odd) td { background: white; }
+  .weekly-table tbody tr:nth-child(even) td { background: #fafafa; }
+  .weekly-table tr.avg-row td {
+    background: var(--bg) !important;
+    font-weight: 700; font-size: 11px;
+    border-top: 2px solid var(--border); color: var(--text); padding: 9px 3px;
+  }
+  .weekly-table tr.avg-row td.date-cell { color: var(--text-muted); }
+
+  .bp-val { font-weight: 700; }
+  .bp-val.empty { color: var(--border); }
+  .bp-val.high { color: var(--danger); }
+  .bp-val.normal { color: var(--success); }
+
+  ::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>❤️ 血圧手帳</h1>
+  <div class="subtitle">毎日の血圧を記録・管理</div>
+</header>
+
+<main class="content">
+  <!-- 記録タブ -->
+  <div class="tab-panel active" id="tab-record">
+    <div class="card">
+      <div class="card-title">記録する</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>日付</label>
+          <input type="date" id="input-date">
+        </div>
+      </div>
+
+      <!-- 朝の入力 -->
+      <div style="background:#fff7e0; border-radius:14px; padding:14px; margin-bottom:12px;">
+        <div style="font-size:13px; font-weight:700; color:#d97706; margin-bottom:10px;">☀️ 朝の測定</div>
+        <div class="bp-inputs">
+          <div class="bp-input-group">
+            <div class="bp-input-label">上（最高）</div>
+            <input type="number" id="m-systolic" placeholder="120" min="50" max="300" inputmode="numeric">
+            <div class="bp-input-unit">mmHg</div>
+          </div>
+          <div class="bp-input-group">
+            <div class="bp-input-label">下（最低）</div>
+            <input type="number" id="m-diastolic" placeholder="80" min="30" max="200" inputmode="numeric">
+            <div class="bp-input-unit">mmHg</div>
+          </div>
+          <div class="bp-input-group">
+            <div class="bp-input-label">脈拍</div>
+            <input type="number" id="m-pulse" placeholder="70" min="30" max="250" inputmode="numeric" style="color:var(--secondary);">
+            <div class="bp-input-unit">bpm</div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+          <input type="text" id="m-memo" placeholder="メモ（任意）" style="font-size:13px; padding:8px 12px; border:2px solid #fcd34d; border-radius:8px; width:100%; outline:none; font-family:inherit;">
+        </div>
+      </div>
+
+      <!-- 晩の入力 -->
+      <div style="background:#ede9fe; border-radius:14px; padding:14px; margin-bottom:14px;">
+        <div style="font-size:13px; font-weight:700; color:#7c3aed; margin-bottom:10px;">🌙 晩の測定</div>
+        <div class="bp-inputs">
+          <div class="bp-input-group">
+            <div class="bp-input-label">上（最高）</div>
+            <input type="number" id="e-systolic" placeholder="120" min="50" max="300" inputmode="numeric">
+            <div class="bp-input-unit">mmHg</div>
+          </div>
+          <div class="bp-input-group">
+            <div class="bp-input-label">下（最低）</div>
+            <input type="number" id="e-diastolic" placeholder="80" min="30" max="200" inputmode="numeric">
+            <div class="bp-input-unit">mmHg</div>
+          </div>
+          <div class="bp-input-group">
+            <div class="bp-input-label">脈拍</div>
+            <input type="number" id="e-pulse" placeholder="70" min="30" max="250" inputmode="numeric" style="color:var(--secondary);">
+            <div class="bp-input-unit">bpm</div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+          <input type="text" id="e-memo" placeholder="メモ（任意）" style="font-size:13px; padding:8px 12px; border:2px solid #c4b5fd; border-radius:8px; width:100%; outline:none; font-family:inherit;">
+        </div>
+      </div>
+
+      <button class="btn-save" onclick="saveRecord()">💾  保存する</button>
+    </div>
+
+    <div class="card" id="today-card" style="display:none;">
+      <div class="card-title">今日の記録</div>
+      <div id="today-records"></div>
+    </div>
+
+    <div class="card" id="advice-card" style="display:none;">
+      <div class="card-title">血圧チェック</div>
+      <div id="advice-content"></div>
+    </div>
+  </div>
+
+  <!-- 週間タブ -->
+  <div class="tab-panel" id="tab-weekly">
+    <div class="card">
+      <div class="card-title">週間血圧記録</div>
+      <div class="week-nav">
+        <button class="week-nav-btn" onclick="changeWeek(-1)">‹</button>
+        <div class="week-label" id="week-label"></div>
+        <button class="week-nav-btn" onclick="changeWeek(1)" id="week-next-btn">›</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="weekly-table">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:36px;">月/日</th>
+              <th colspan="3" class="morning-h">☀️ 朝</th>
+              <th colspan="3" class="evening-h">🌙 晩</th>
+            </tr>
+            <tr>
+              <th class="morning-h" style="width:32px;">上</th>
+              <th class="morning-h" style="width:32px;">下</th>
+              <th class="morning-h" style="width:30px;">脈</th>
+              <th class="evening-h" style="width:32px;">上</th>
+              <th class="evening-h" style="width:32px;">下</th>
+              <th class="evening-h" style="width:30px;">脈</th>
+            </tr>
+          </thead>
+          <tbody id="weekly-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" id="weekly-avg-card" style="display:none;">
+      <div class="card-title">今週の平均</div>
+      <div id="weekly-avg-content"></div>
+    </div>
+  </div>
+
+  <!-- 履歴タブ -->
+  <div class="tab-panel" id="tab-history">
+    <div class="card">
+      <div class="card-title">記録一覧</div>
+      <div class="filter-bar">
+        <select id="history-filter" onchange="renderHistory()">
+          <option value="all">すべて</option>
+          <option value="morning">☀️ 朝のみ</option>
+          <option value="evening">🌙 晩のみ</option>
+        </select>
+        <select id="history-month" onchange="renderHistory()"></select>
+      </div>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <!-- グラフタブ -->
+  <div class="tab-panel" id="tab-graph">
+    <div class="card">
+      <div class="card-title">血圧グラフ</div>
+      <div class="period-tabs">
+        <button class="period-tab active" onclick="setPeriod(7, this)">1週間</button>
+        <button class="period-tab" onclick="setPeriod(14, this)">2週間</button>
+        <button class="period-tab" onclick="setPeriod(30, this)">1ヶ月</button>
+        <button class="period-tab" onclick="setPeriod(90, this)">3ヶ月</button>
+      </div>
+      <div class="chart-container" style="position:relative;">
+        <canvas id="bp-chart"></canvas>
+        <div id="no-data-msg" class="no-data-chart" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%;">データがありません</div>
+      </div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#e74c6f;"></div>最高血圧</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div>最低血圧</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div>脈拍</div>
+      </div>
+    </div>
+    <div class="card" id="stats-card">
+      <div class="card-title">期間統計</div>
+      <div id="stats-content"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">朝・晩 平均比較</div>
+      <div class="chart-container" style="height:180px;">
+        <canvas id="compare-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定タブ -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="card">
+      <div class="card-title">目標値設定</div>
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">目標 最高血圧</div>
+          <div class="setting-desc">推奨: 130 mmHg 未満</div>
+        </div>
+        <input type="number" class="setting-input" id="goal-systolic" value="130">
+      </div>
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">目標 最低血圧</div>
+          <div class="setting-desc">推奨: 80 mmHg 未満</div>
+        </div>
+        <input type="number" class="setting-input" id="goal-diastolic" value="80">
+      </div>
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">目標 脈拍</div>
+          <div class="setting-desc">安静時: 60〜100 bpm</div>
+        </div>
+        <input type="number" class="setting-input" id="goal-pulse" value="70">
+      </div>
+      <button class="btn-save" style="margin-top:14px;" onclick="saveSettings()">設定を保存</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">血圧の分類（日本高血圧学会）</div>
+      <table class="bp-table">
+        <tr><th>分類</th><th>収縮期(上)</th><th>拡張期(下)</th></tr>
+        <tr><td><span class="bp-badge badge-low">低血圧</span></td><td>〜89</td><td>〜59</td></tr>
+        <tr><td><span class="bp-badge badge-normal">正常血圧</span></td><td>〜119</td><td>〜79</td></tr>
+        <tr><td><span class="bp-badge badge-elevated">正常高値</span></td><td>120〜129</td><td>〜79</td></tr>
+        <tr><td><span class="bp-badge badge-high1">高値血圧</span></td><td>130〜139</td><td>80〜89</td></tr>
+        <tr><td><span class="bp-badge badge-high2">高血圧1度</span></td><td>140〜159</td><td>90〜99</td></tr>
+        <tr><td><span class="bp-badge badge-crisis">高血圧2度+</span></td><td>160〜</td><td>100〜</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">データ管理</div>
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">データをエクスポート</div>
+          <div class="setting-desc">CSVファイルでダウンロード</div>
+        </div>
+        <button onclick="exportCSV()" style="padding:8px 14px; background:var(--secondary); color:white; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;">CSV</button>
+      </div>
+      <div class="setting-item">
+        <div>
+          <div class="setting-label" style="color:var(--danger);">全データ削除</div>
+          <div class="setting-desc">この操作は取り消せません</div>
+        </div>
+        <button onclick="deleteAllData()" style="padding:8px 14px; background:#fee2e2; color:var(--danger); border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;">削除</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">アプリについて</div>
+      <div style="font-size:13px; color:var(--text-muted); line-height:1.8;">
+        <p>血圧手帳 v1.1</p>
+        <p>データはこの端末のブラウザに保存されます。</p>
+        <p style="margin-top:8px; font-size:11px;">⚠️ このアプリは健康管理の補助ツールです。<br>医療診断の代わりにはなりません。</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ナビゲーション（健康テーマアイコン） -->
+<nav class="nav-bar">
+  <button class="nav-item active" id="nav-record" onclick="switchTab('record')">
+    <!-- ハートアイコン（記録） -->
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+    </svg>
+    記録
+  </button>
+  <button class="nav-item" id="nav-weekly" onclick="switchTab('weekly')">
+    <!-- カレンダーアイコン（週間） -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="4" width="18" height="18" rx="2"/>
+      <line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+      <line x1="8" y1="14" x2="8" y2="14" stroke-width="3" stroke-linecap="round"/>
+      <line x1="12" y1="14" x2="12" y2="14" stroke-width="3" stroke-linecap="round"/>
+      <line x1="16" y1="14" x2="16" y2="14" stroke-width="3" stroke-linecap="round"/>
+      <line x1="8" y1="18" x2="8" y2="18" stroke-width="3" stroke-linecap="round"/>
+      <line x1="12" y1="18" x2="12" y2="18" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    週間
+  </button>
+  <button class="nav-item" id="nav-graph" onclick="switchTab('graph')">
+    <!-- ECG波形アイコン（グラフ） -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="2 12 6 12 8 5 11 19 14 9 16 14 18 12 22 12"/>
+    </svg>
+    グラフ
+  </button>
+  <button class="nav-item" id="nav-history" onclick="switchTab('history')">
+    <!-- 時計アイコン（履歴） -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <polyline points="12 6 12 12 16 14"/>
+    </svg>
+    履歴
+  </button>
+  <button class="nav-item" id="nav-settings" onclick="switchTab('settings')">
+    <!-- 歯車アイコン（設定） -->
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+    </svg>
+    設定
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let records = [];
+try { records = JSON.parse(localStorage.getItem('bp_records') || '[]'); } catch(e) { records = []; }
+
+let settings = { goalSystolic:130, goalDiastolic:80, goalPulse:70 };
+try {
+  const s = JSON.parse(localStorage.getItem('bp_settings') || '{}');
+  settings = { goalSystolic: s.goalSystolic||130, goalDiastolic: s.goalDiastolic||80, goalPulse: s.goalPulse||70 };
+} catch(e) { /* デフォルト値を使用 */ }
+let chartPeriod = 7;
+let bpChart = null;
+let compareChart = null;
+let weekOffset = 0;
+
+function init() {
+  const today = new Date();
+  document.getElementById('input-date').value = formatDate(today);
+  loadSettings();
+  renderTodayRecords();
+  populateMonthFilter();
+}
+
+function formatDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function formatDateJP(str) {
+  const [y, m, d] = str.split('-');
+  return `${y}年${m}月${d}日`;
+}
+function getDayOfWeek(str) {
+  return ['日','月','火','水','木','金','土'][new Date(str).getDay()];
+}
+
+function classifyBP(sys, dia) {
+  if (sys < 90 && dia < 60) return { label: '低血圧',      cls: 'badge-low',     level: -1 };
+  if (sys < 120 && dia < 80) return { label: '正常血圧',   cls: 'badge-normal',  level:  0 };
+  if (sys < 130 && dia < 80) return { label: '正常高値',   cls: 'badge-elevated',level:  1 };
+  if (sys < 140 && dia < 90) return { label: '高値血圧',   cls: 'badge-high1',   level:  2 };
+  if (sys < 160 && dia < 100) return { label: '高血圧1度', cls: 'badge-high2',   level:  3 };
+  return { label: '高血圧2度以上', cls: 'badge-crisis', level: 4 };
+}
+
+function getAdvice(sys, dia) {
+  const cls = classifyBP(sys, dia);
+  const advices = {
+    '-1': { type:'warning', icon:'⚠️', msg:'血圧が低めです。めまいや立ちくらみに注意し、水分・塩分の摂取を心がけてください。' },
+    '0':  { type:'success', icon:'✅', msg:'血圧は正常範囲です。この調子で健康的な生活を続けましょう！' },
+    '1':  { type:'warning', icon:'⚠️', msg:'正常より少し高めです。減塩・適度な運動・禁煙を心がけましょう。' },
+    '2':  { type:'warning', icon:'⚠️', msg:'血圧が高値です。生活習慣の改善と定期的な医師への相談をお勧めします。' },
+    '3':  { type:'danger',  icon:'🚨', msg:'高血圧1度です。医師への相談をお勧めします。減塩・体重管理・運動習慣が重要です。' },
+    '4':  { type:'danger',  icon:'🆘', msg:'血圧がかなり高い状態です。速やかに医師にご相談ください。' },
+  };
+  return { ...advices[String(cls.level)], classification: cls };
+}
+
+function saveRecord() {
+  const date   = document.getElementById('input-date').value;
+  if (!date) return showToast('日付を選択してください');
+
+  const mSys   = parseInt(document.getElementById('m-systolic').value);
+  const mDia   = parseInt(document.getElementById('m-diastolic').value);
+  const mPulse = parseInt(document.getElementById('m-pulse').value);
+  const mMemo  = document.getElementById('m-memo').value.trim();
+  const eSys   = parseInt(document.getElementById('e-systolic').value);
+  const eDia   = parseInt(document.getElementById('e-diastolic').value);
+  const ePulse = parseInt(document.getElementById('e-pulse').value);
+  const eMemo  = document.getElementById('e-memo').value.trim();
+
+  const hasMorning = !isNaN(mSys) && !isNaN(mDia) && !isNaN(mPulse);
+  const hasEvening = !isNaN(eSys) && !isNaN(eDia) && !isNaN(ePulse);
+
+  if (!hasMorning && !hasEvening) return showToast('朝か晩、どちらかを入力してください');
+  if (hasMorning) {
+    if (mSys<50||mSys>300) return showToast('朝：最高血圧を正しく入力してください（50〜300）');
+    if (mDia<30||mDia>200) return showToast('朝：最低血圧を正しく入力してください（30〜200）');
+    if (mPulse<30||mPulse>250) return showToast('朝：脈拍を正しく入力してください（30〜250）');
+  }
+  if (hasEvening) {
+    if (eSys<50||eSys>300) return showToast('晩：最高血圧を正しく入力してください（50〜300）');
+    if (eDia<30||eDia>200) return showToast('晩：最低血圧を正しく入力してください（30〜200）');
+    if (ePulse<30||ePulse>250) return showToast('晩：脈拍を正しく入力してください（30〜250）');
+  }
+
+  const now = Date.now();
+  if (hasMorning) records.push({ id:now,   date, time:'morning', systolic:mSys, diastolic:mDia, pulse:mPulse, memo:mMemo });
+  if (hasEvening) records.push({ id:now+1, date, time:'evening', systolic:eSys, diastolic:eDia, pulse:ePulse, memo:eMemo });
+
+  records.sort((a,b) => a.date<b.date?1:a.date>b.date?-1:a.time==='morning'?1:-1);
+  localStorage.setItem('bp_records', JSON.stringify(records));
+
+  ['m-systolic','m-diastolic','m-pulse','m-memo','e-systolic','e-diastolic','e-pulse','e-memo']
+    .forEach(id => { document.getElementById(id).value = ''; });
+
+  const count = (hasMorning?1:0)+(hasEvening?1:0);
+  showToast(`${count}件の記録を保存しました ✓`);
+  renderTodayRecords();
+  const sys = hasMorning ? mSys : eSys;
+  const dia = hasMorning ? mDia : eDia;
+  renderAdvice(sys, dia);
+}
+
+function renderTodayRecords() {
+  const today = formatDate(new Date());
+  const todayRecs = records.filter(r => r.date === today);
+  const card = document.getElementById('today-card');
+  if (!todayRecs.length) { card.style.display='none'; return; }
+  card.style.display = 'block';
+
+  const html = todayRecs.map(r => `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div class="record-time-icon ${r.time}">${r.time==='morning'?'☀️':'🌙'}</div>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:700;">${r.systolic} / ${r.diastolic} <span style="font-size:12px;color:var(--text-muted);">mmHg</span>　❤️ ${r.pulse} <span style="font-size:12px;color:var(--text-muted);">bpm</span></div>
+        ${r.memo?`<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${r.memo}</div>`:''}
+        <div style="margin-top:4px;"><span class="bp-badge ${classifyBP(r.systolic,r.diastolic).cls}">${classifyBP(r.systolic,r.diastolic).label}</span></div>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('today-records').innerHTML = html;
+  const latest = todayRecs[0];
+  renderAdvice(latest.systolic, latest.diastolic);
+}
+
+function renderAdvice(sys, dia) {
+  const adv = getAdvice(sys, dia);
+  document.getElementById('advice-card').style.display = 'block';
+  document.getElementById('advice-content').innerHTML = `
+    <div class="alert-banner alert-${adv.type}">
+      <span style="font-size:20px;">${adv.icon}</span>
+      <div>
+        <div style="font-weight:700;margin-bottom:2px;">${adv.classification.label}</div>
+        <div style="font-size:12px;line-height:1.5;">${adv.msg}</div>
+      </div>
+    </div>`;
+}
+
+function renderHistory() {
+  const filter = document.getElementById('history-filter').value;
+  const month  = document.getElementById('history-month').value;
+  let filtered = [...records];
+  if (filter !== 'all') filtered = filtered.filter(r => r.time === filter);
+  if (month  !== 'all') filtered = filtered.filter(r => r.date.startsWith(month));
+
+  const list = document.getElementById('history-list');
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>記録がありません</p></div>`;
+    return;
+  }
+
+  const grouped = {};
+  filtered.forEach(r => { if(!grouped[r.date]) grouped[r.date]=[]; grouped[r.date].push(r); });
+
+  let html = '';
+  Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).forEach(date => {
+    html += `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin:12px 0 4px;">${formatDateJP(date)}（${getDayOfWeek(date)}）</div>`;
+    grouped[date].forEach(r => {
+      const cls = classifyBP(r.systolic, r.diastolic);
+      html += `
+        <div class="record-item">
+          <div class="record-time-icon ${r.time}">${r.time==='morning'?'☀️':'🌙'}</div>
+          <div class="record-info">
+            <div class="record-values">${r.systolic} / ${r.diastolic} mmHg　❤️ ${r.pulse} bpm</div>
+            ${r.memo?`<div style="font-size:11px;color:var(--text-muted);">${r.memo}</div>`:''}
+            <div style="margin-top:4px;"><span class="bp-badge ${cls.cls}">${cls.label}</span></div>
+          </div>
+          <button class="record-delete" onclick="deleteRecord(${r.id})">🗑</button>
+        </div>`;
+    });
+  });
+  list.innerHTML = html;
+}
+
+function deleteRecord(id) {
+  if (!confirm('この記録を削除しますか？')) return;
+  records = records.filter(r => r.id !== id);
+  localStorage.setItem('bp_records', JSON.stringify(records));
+  renderHistory();
+  renderTodayRecords();
+  showToast('削除しました');
+}
+
+function populateMonthFilter() {
+  const sel = document.getElementById('history-month');
+  const months = [...new Set(records.map(r => r.date.substring(0,7)))].sort((a,b)=>b.localeCompare(a));
+  sel.innerHTML = '<option value="all">全期間</option>' + months.map(m => {
+    const [y, mo] = m.split('-');
+    return `<option value="${m}">${y}年${parseInt(mo)}月</option>`;
+  }).join('');
+}
+
+function setPeriod(days, el) {
+  chartPeriod = days;
+  document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderCharts();
+}
+
+function renderCharts() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - chartPeriod);
+  const cutoffStr = formatDate(cutoff);
+  const filtered = records.filter(r => r.date >= cutoffStr).sort((a,b) => a.date>b.date?1:-1);
+  const dateSet = [...new Set(filtered.map(r => r.date))].sort();
+
+  const sysData=[], diaData=[], pulseData=[];
+  dateSet.forEach(d => {
+    const recs = filtered.filter(r => r.date === d);
+    sysData.push(Math.round(recs.reduce((a,r)=>a+r.systolic,0)/recs.length));
+    diaData.push(Math.round(recs.reduce((a,r)=>a+r.diastolic,0)/recs.length));
+    pulseData.push(Math.round(recs.reduce((a,r)=>a+r.pulse,0)/recs.length));
+  });
+
+  const labels = dateSet.map(d => { const [,m,dd]=d.split('-'); return `${parseInt(m)}/${parseInt(dd)}`; });
+  const ctx = document.getElementById('bp-chart').getContext('2d');
+  if (bpChart) bpChart.destroy();
+
+  if (!filtered.length) {
+    document.getElementById('bp-chart').style.display='none';
+    document.getElementById('no-data-msg').style.display='flex';
+    renderStats([]);
+    renderCompareChart([]);
+    return;
+  }
+
+  document.getElementById('bp-chart').style.display='block';
+  document.getElementById('no-data-msg').style.display='none';
+
+  bpChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'最高血圧', data:sysData,   borderColor:'#e74c6f', backgroundColor:'rgba(231,76,111,0.1)', tension:0.4, fill:true, pointBackgroundColor:'#e74c6f', pointRadius:4 },
+        { label:'最低血圧', data:diaData,   borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.08)', tension:0.4, fill:true, pointBackgroundColor:'#3b82f6', pointRadius:4 },
+        { label:'脈拍',     data:pulseData, borderColor:'#22c55e', backgroundColor:'transparent', tension:0.4, borderDash:[5,3], pointBackgroundColor:'#22c55e', pointRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: { legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`}} },
+      scales: {
+        x: { grid:{display:false}, ticks:{font:{size:10}} },
+        y: { min:40, grid:{color:'rgba(0,0,0,0.05)'}, ticks:{font:{size:10}} }
+      }
+    }
+  });
+
+  renderStats(filtered);
+  renderCompareChart(filtered);
+}
+
+function renderStats(filtered) {
+  const el = document.getElementById('stats-content');
+  if (!filtered.length) {
+    el.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:14px;padding:20px;">データがありません</p>';
+    return;
+  }
+  const avg = arr => Math.round(arr.reduce((a,b)=>a+b,0)/arr.length);
+  const max = arr => Math.max(...arr);
+  const min = arr => Math.min(...arr);
+  const sys   = filtered.map(r=>r.systolic);
+  const dia   = filtered.map(r=>r.diastolic);
+  const pulse = filtered.map(r=>r.pulse);
+
+  const section = (label, arr, color) => `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;">${label}</div>
+      <div class="stats-grid">
+        <div class="stat-item"><div class="stat-value" style="color:${color};">${avg(arr)}</div><div class="stat-label">平均</div></div>
+        <div class="stat-item"><div class="stat-value" style="color:#ef4444;">${max(arr)}</div><div class="stat-label">最大</div></div>
+        <div class="stat-item"><div class="stat-value" style="color:#22c55e;">${min(arr)}</div><div class="stat-label">最小</div></div>
+      </div>
+    </div>`;
+
+  el.innerHTML =
+    section('最高血圧 (mmHg)', sys,   'var(--primary)') +
+    section('最低血圧 (mmHg)', dia,   'var(--secondary)') +
+    section('脈拍 (bpm)',       pulse, '#22c55e') +
+    `<div style="font-size:11px;color:var(--text-muted);text-align:right;">${filtered.length}件のデータ</div>`;
+}
+
+function renderCompareChart(filtered) {
+  const morning = filtered.filter(r=>r.time==='morning');
+  const evening = filtered.filter(r=>r.time==='evening');
+  const avg = (arr,key) => arr.length ? Math.round(arr.reduce((a,r)=>a+r[key],0)/arr.length) : 0;
+  const ctx = document.getElementById('compare-chart').getContext('2d');
+  if (compareChart) { compareChart.destroy(); compareChart=null; }
+  if (!filtered.length) return;
+
+  compareChart = new Chart(ctx, {
+    type:'bar',
+    data: {
+      labels:['最高血圧','最低血圧','脈拍'],
+      datasets: [
+        { label:'☀️ 朝', data:[avg(morning,'systolic'),avg(morning,'diastolic'),avg(morning,'pulse')], backgroundColor:'rgba(245,158,11,0.7)', borderRadius:6 },
+        { label:'🌙 晩', data:[avg(evening,'systolic'),avg(evening,'diastolic'),avg(evening,'pulse')], backgroundColor:'rgba(139,92,246,0.7)', borderRadius:6 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: { legend:{position:'bottom',labels:{font:{size:11},boxWidth:12,padding:10}}, tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`}} },
+      scales: { x:{grid:{display:false},ticks:{font:{size:11}}}, y:{min:0,grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10}}} }
+    }
+  });
+}
+
+// タブ切り替え（フェードアニメーション付き）
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+  const panel = document.getElementById('tab-'+tab);
+  panel.classList.add('active');
+
+  document.getElementById('nav-'+tab).classList.add('active');
+
+  if (tab==='history') { populateMonthFilter(); renderHistory(); }
+  if (tab==='graph') renderCharts();
+  if (tab==='weekly') renderWeekly();
+}
+
+// 週間ビュー
+function getWeekDates(offset) {
+  const today = new Date();
+  const day = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate()-(day===0?6:day-1)+offset*7);
+  const dates=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(monday); d.setDate(monday.getDate()+i);
+    dates.push(formatDate(d));
+  }
+  return dates;
+}
+
+function changeWeek(dir) {
+  weekOffset += dir;
+  if (weekOffset > 0) weekOffset = 0;
+  document.getElementById('week-next-btn').style.opacity = weekOffset===0?'0.3':'1';
+  document.getElementById('week-next-btn').disabled = weekOffset===0;
+  renderWeekly();
+}
+
+function renderWeekly() {
+  const dates = getWeekDates(weekOffset);
+  const todayStr = formatDate(new Date());
+  const [sy,sm,sd] = dates[0].split('-');
+  const [,em,ed]   = dates[6].split('-');
+  document.getElementById('week-label').textContent =
+    `${sy}年${parseInt(sm)}月${parseInt(sd)}日 〜 ${parseInt(em)}月${parseInt(ed)}日`;
+  document.getElementById('week-next-btn').style.opacity = weekOffset===0?'0.3':'1';
+  document.getElementById('week-next-btn').disabled = weekOffset===0;
+
+  const dayNames = ['月','火','水','木','金','土','日'];
+  const tbody = document.getElementById('weekly-tbody');
+  let html='';
+  const morningData=[], eveningData=[];
+
+  dates.forEach((dateStr,i) => {
+    const [,m,d] = dateStr.split('-');
+    const isToday = dateStr===todayStr;
+    const isSat=i===5, isSun=i===6;
+    const dayColor = isToday?'':isSun?'color:#ef4444;':isSat?'color:#3b82f6;':'';
+    const mRec = records.find(r=>r.date===dateStr&&r.time==='morning');
+    const eRec = records.find(r=>r.date===dateStr&&r.time==='evening');
+    if(mRec) morningData.push(mRec);
+    if(eRec) eveningData.push(eRec);
+    const mSys = mRec?colorVal(mRec.systolic,'sys'):'<span class="bp-val empty">—</span>';
+    const mDia = mRec?colorVal(mRec.diastolic,'dia'):'<span class="bp-val empty">—</span>';
+    const mPul = mRec?colorVal(mRec.pulse,'pul'):'<span class="bp-val empty">—</span>';
+    const eSys = eRec?colorVal(eRec.systolic,'sys'):'<span class="bp-val empty">—</span>';
+    const eDia = eRec?colorVal(eRec.diastolic,'dia'):'<span class="bp-val empty">—</span>';
+    const ePul = eRec?colorVal(eRec.pulse,'pul'):'<span class="bp-val empty">—</span>';
+    html += `
+      <tr>
+        <td class="date-cell ${isToday?'today':''}" style="${dayColor}">
+          ${parseInt(m)}/${parseInt(d)}<br><span style="font-size:9px;">${dayNames[i]}</span>
+        </td>
+        <td>${mSys}</td><td>${mDia}</td><td>${mPul}</td>
+        <td>${eSys}</td><td>${eDia}</td><td>${ePul}</td>
+      </tr>`;
+  });
+
+  const avgM = calcAvg(morningData);
+  const avgE = calcAvg(eveningData);
+  html += `
+    <tr class="avg-row">
+      <td class="date-cell">平均</td>
+      <td>${avgM.sys}</td><td>${avgM.dia}</td><td>${avgM.pul}</td>
+      <td>${avgE.sys}</td><td>${avgE.dia}</td><td>${avgE.pul}</td>
+    </tr>`;
+  tbody.innerHTML = html;
+  renderWeeklyAvgCard(morningData, eveningData);
+}
+
+function colorVal(val, type) {
+  let cls='normal';
+  if(type==='sys'&&val>=140) cls='high';
+  else if(type==='dia'&&val>=90) cls='high';
+  else if(type==='pul'&&(val>100||val<50)) cls='high';
+  return `<span class="bp-val ${cls}">${val}</span>`;
+}
+
+function calcAvg(arr) {
+  if(!arr.length) return { sys:'<span class="bp-val empty">—</span>', dia:'<span class="bp-val empty">—</span>', pul:'<span class="bp-val empty">—</span>' };
+  const s=Math.round(arr.reduce((a,r)=>a+r.systolic,0)/arr.length);
+  const d=Math.round(arr.reduce((a,r)=>a+r.diastolic,0)/arr.length);
+  const p=Math.round(arr.reduce((a,r)=>a+r.pulse,0)/arr.length);
+  return { sys:colorVal(s,'sys'), dia:colorVal(d,'dia'), pul:colorVal(p,'pul') };
+}
+
+function renderWeeklyAvgCard(morningData, eveningData) {
+  const card = document.getElementById('weekly-avg-card');
+  if(!morningData.length&&!eveningData.length){card.style.display='none';return;}
+  card.style.display='block';
+  const avgVal=(arr,key)=>arr.length?Math.round(arr.reduce((a,r)=>a+r[key],0)/arr.length):null;
+  const mSys=avgVal(morningData,'systolic'), mDia=avgVal(morningData,'diastolic'), mPul=avgVal(morningData,'pulse');
+  const eSys=avgVal(eveningData,'systolic'), eDia=avgVal(eveningData,'diastolic'), ePul=avgVal(eveningData,'pulse');
+  const block=(label,sys,dia,pul,bg,color)=>{
+    if(sys===null)return'';
+    const cls=classifyBP(sys,dia);
+    return `
+      <div style="background:${bg};border-radius:14px;padding:14px;flex:1;">
+        <div style="font-size:12px;font-weight:700;color:${color};margin-bottom:10px;">${label}</div>
+        <div style="font-size:22px;font-weight:800;color:${color};line-height:1;">${sys}<span style="font-size:13px;font-weight:400;color:var(--text-muted);"> / ${dia}</span></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">mmHg</div>
+        <div style="font-size:14px;font-weight:700;color:var(--secondary);margin-top:8px;">❤️ ${pul} <span style="font-size:11px;font-weight:400;color:var(--text-muted);">bpm</span></div>
+        <div style="margin-top:6px;"><span class="bp-badge ${cls.cls}">${cls.label}</span></div>
+      </div>`;
+  };
+  document.getElementById('weekly-avg-content').innerHTML = `
+    <div style="display:flex;gap:10px;">
+      ${block('☀️ 朝の平均',mSys,mDia,mPul,'#fff7e0','#d97706')}
+      ${block('🌙 晩の平均',eSys,eDia,ePul,'#ede9fe','#7c3aed')}
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);text-align:right;margin-top:8px;">
+      朝${morningData.length}件・晩${eveningData.length}件のデータ
+    </div>`;
+}
+
+function loadSettings() {
+  document.getElementById('goal-systolic').value  = settings.goalSystolic  || 130;
+  document.getElementById('goal-diastolic').value = settings.goalDiastolic || 80;
+  document.getElementById('goal-pulse').value     = settings.goalPulse     || 70;
+}
+
+function saveSettings() {
+  settings = {
+    goalSystolic:  parseInt(document.getElementById('goal-systolic').value),
+    goalDiastolic: parseInt(document.getElementById('goal-diastolic').value),
+    goalPulse:     parseInt(document.getElementById('goal-pulse').value),
+  };
+  localStorage.setItem('bp_settings', JSON.stringify(settings));
+  showToast('設定を保存しました ✓');
+}
+
+function exportCSV() {
+  if(!records.length) return showToast('エクスポートするデータがありません');
+  const esc = v => { const s=String(v||''); return (s.includes(',')||s.includes('"')||s.includes('\n')) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const header = '日付,時間帯,最高血圧,最低血圧,脈拍,分類,メモ\n';
+  const rows = records.map(r => {
+    const cls = classifyBP(r.systolic, r.diastolic);
+    return [r.date, r.time==='morning'?'朝':'晩', r.systolic, r.diastolic, r.pulse, cls.label, r.memo||''].map(esc).join(',');
+  }).join('\n');
+  const blob = new Blob(['\uFEFF'+header+rows], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download=`血圧記録_${formatDate(new Date())}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSVをダウンロードしました');
+}
+
+function deleteAllData() {
+  if(!confirm('全てのデータを削除しますか？\nこの操作は取り消せません。')) return;
+  records=[];
+  if(bpChart){ bpChart.destroy(); bpChart=null; }
+  if(compareChart){ compareChart.destroy(); compareChart=null; }
+  localStorage.removeItem('bp_records');
+  renderTodayRecords(); populateMonthFilter(); renderHistory(); renderCharts(); renderWeekly();
+  showToast('全データを削除しました');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+init();
+</script>
+</body>
+</html>
